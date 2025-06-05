@@ -8,6 +8,7 @@ import threading
 import base64 
 import asyncio
 import os
+from flask import redirect, request
 
 app = Flask(__name__)
 
@@ -134,6 +135,11 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
+@app.before_request
+def redirect_to_https():
+    if request.headers.get('X-Forwarded-Proto', 'http') == 'http':
+        url = request.url.replace('http://', 'https://', 1)
+        return redirect(url, code=301)
 
 @app.route('/')
 def index():

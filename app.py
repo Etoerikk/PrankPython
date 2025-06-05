@@ -4,6 +4,7 @@ from telegram import Bot
 import uuid
 from datetime import datetime
 import asyncio
+import os
 
 load_dotenv()
 
